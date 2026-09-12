@@ -10,18 +10,31 @@ struct Task: Identifiable, Codable {
 }
 
 struct ContentView: View {
-    @State private var tasks: [Task] = []
+    @AppStorage("appTitle") private var appTitle = "Nuss To-Do List"
+    @AppStorage("waterGoal") private var waterGoal: Double = 2.0
+    @AppStorage("waterDrank") private var waterDrank: Double = 0.0
+    @AppStorage("dailyNote") private var dailyNote = ""
+    @AppStorage("isWaterReminderOn") private var isWaterReminderOn = false
+
+    @State private var tasks: [Task] = {
+        if let data = UserDefaults.standard.data(forKey: "savedTasks"),
+           let decodedTasks = try? JSONDecoder().decode([Task].self, from: data) {
+            return decodedTasks
+        }
+        return []
+    }() {
+        didSet {
+            if let encoded = try? JSONEncoder().encode(tasks) {
+                UserDefaults.standard.set(encoded, forKey: "savedTasks")
+            }
+        }
+    }
+
     @State private var newTaskTitle = ""
     @State private var newTaskDuration = 15
     @State private var selectedDate = Date()
-    @State private var appTitle = "Nuss To-Do List"
     @State private var isEditingTitle = false
-
-    @State private var waterDrank: Double = 0.0
-    @State private var waterGoal: Double = 2.0
-    @State private var isWaterReminderOn = false
-
-    @State private var dailyNote = ""
+    @State private var showingGoalSettings = false
 
     @State private var activeTimerTaskID: UUID? = nil
     @State private var remainingSeconds: Int = 0
@@ -31,6 +44,12 @@ struct ContentView: View {
         let formatter = DateFormatter()
         formatter.locale = Locale(identifier: "tr_TR")
         formatter.dateFormat = "yyyy-MM-dd"
+        return formatter
+    }()
+
+    private let dayFormatter: DateFormatter = {
+        let formatter = DateFormatter()
+        formatter.locale = Locale(identifier: "tr_TR")
         return formatter
     }()
 
@@ -80,8 +99,8 @@ struct ContentView: View {
 
                         ScrollView(.horizontal, showsIndicators: false) {
                             HStack(spacing: 12) {
-                                ForEach(-3...4, id: \.self) { offset in
-                                    let date = Calendar.current.date(byAdding: .day, value: offset, to: Date())!
+                                ForEach(-7...7, id: \.self) { offset in
+                                    let date = Calendar.current.date(byAdding: .day, value: offset, to: Date()) ?? Date()
                                     let isSelected = Calendar.current.isDate(date, inSameDayAs: selectedDate)
 
                                     VStack(spacing: 6) {
@@ -123,6 +142,44 @@ struct ContentView: View {
                                     .foregroundColor(Color(red: 0.1, green: 0.4, blue: 0.8))
 
                                 Spacer()
+
+                                Button(action: {
+                                    showingGoalSettings.toggle()
+                                }) {
+                                    Image(systemName: "gearshape.fill")
+                                        .font(.subheadline)
+                                        .foregroundColor(.secondary)
+                                }
+                                .sheet(isPresented: $showingGoalSettings) {
+                                    VStack(spacing: 20) {
+                                        Text("Günlük Su Hedefi Belirle")
+                                            .font(.headline)
+                                            .padding(.top)
+
+                                        Picker("Hedef", selection: $waterGoal) {
+                                            Text("1.5 Litre").tag(1.5)
+                                            Text("2.0 Litre").tag(2.0)
+                                            Text("2.5 Litre").tag(2.5)
+                                            Text("3.0 Litre").tag(3.0)
+                                            Text("3.5 Litre").tag(3.5)
+                                            Text("4.0 Litre").tag(4.0)
+                                        }
+                                        .pickerStyle(.wheel)
+
+                                        Button("Tamam") {
+                                            showingGoalSettings = false
+                                        }
+                                        .fontWeight(.bold)
+                                        .foregroundColor(.white)
+                                        .padding(.horizontal, 30)
+                                        .padding(.vertical, 12)
+                                        .background(Color.blue)
+                                        .cornerRadius(12)
+
+                                        Spacer()
+                                    }
+                                    .presentationDetents([.height(250)])
+                                }
 
                                 Button(action: {
                                     waterDrank = max(0, waterDrank - 0.25)
@@ -303,7 +360,7 @@ struct ContentView: View {
                                             HStack(spacing: 6) {
                                                 Image(systemName: "clock")
                                                     .font(.caption2)
-                                                
+                                              
                                                 if activeTimerTaskID == task.id {
                                                     Text(formatTime(remainingSeconds))
                                                         .font(.caption)
@@ -346,13 +403,16 @@ struct ContentView: View {
                                 }
                             }
                         }
-                        
+                       
                         Spacer(minLength: 40)
                     }
                 }
             }
         }
         .preferredColorScheme(.light)
+        .onDisappear {
+            stopTimer()
+        }
     }
 
     func addTask() {
@@ -402,10 +462,8 @@ struct ContentView: View {
     }
 
     func dayString(for date: Date, format: String) -> String {
-        let formatter = DateFormatter()
-        formatter.locale = Locale(identifier: "tr_TR")
-        formatter.dateFormat = format
-        return formatter.string(from: date)
+        dayFormatter.dateFormat = format
+        return dayFormatter.string(from: date)
     }
 
     func toggleWaterReminder() {
