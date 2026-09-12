@@ -157,6 +157,7 @@ struct ContentView: View {
                                             .padding(.top)
 
                                         Picker("Hedef", selection: $waterGoal) {
+                                            
                                             Text("1.5 Litre").tag(1.5)
                                             Text("2.0 Litre").tag(2.0)
                                             Text("2.5 Litre").tag(2.5)
@@ -281,6 +282,7 @@ struct ContentView: View {
                                     Image(systemName: "timer")
                                         .foregroundColor(Color(red: 0.9, green: 0.3, blue: 0.5))
                                     Picker("Süre", selection: $newTaskDuration) {
+                                        Text ("-").tag(0)
                                         Text("5 dk").tag(5)
                                         Text("10 dk").tag(10)
                                         Text("15 dk").tag(15)
